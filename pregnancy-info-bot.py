@@ -89,8 +89,12 @@ def init():
     data = request.json
 
     if data['api_key'] != APP_KEY:
+        if DEBUG:
+            print('invalid key')
         return 'invalid key'
     if not check_digit(data['contract_id']):
+        if DEBUG:
+            print('invalid id')
         return 'invalid id'
 
     contract_id = int(data['contract_id'])
@@ -209,7 +213,7 @@ def sender():
                 if not validate_date(contract[1]):
                     continue
                 start = datetime.strptime(contract[1], '%Y-%m-%d')
-                
+
                 if (event[0], contract[0]) not in sent_notifications and get_week(start, today) >= event[2]:
                     send(contract[0], event[1])
                     make_sent(connection, event[0], contract[0])
