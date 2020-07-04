@@ -7,6 +7,7 @@ import requests
 import hashlib, uuid
 from config import *
 import threading
+import json
 
 app = Flask(__name__)
 
@@ -82,6 +83,26 @@ def make_sent(connection, notification_id, contract_id):
     cursor.execute('INSERT INTO sent_notifications (notification_id, contract_id) VALUES (?, ?)',
                    (notification_id, contract_id))
     conn.commit()
+
+
+@app.route('/status', methods=['POST'])
+def status():
+    data = request.json
+
+    if data['api_key'] != APP_KEY:
+        return 'invalid key'
+
+    connection = get_connection()
+
+    answer = {
+        "is_tracking_data": True,
+        "supported_scenarios": [],
+        "tracked_contracts": [int(contract[0]) for contract in get_contracts(connection)]
+    }
+
+    connection[0].close()
+
+    return json.dumps(answer)
 
 
 @app.route('/init', methods=['POST'])
