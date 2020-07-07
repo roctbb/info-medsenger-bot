@@ -13,6 +13,7 @@ app = Flask(__name__)
 
 contracts = {}
 available_modes = ['daily', 'weekly', 'none']
+presets = ['pregnancy', 'stenocardia', 'heartfailure', 'fibrillation']
 
 
 def delayed(delay, f, args):
@@ -42,15 +43,20 @@ def get_connection():
     return conn, cursor
 
 
-def add_contract(connection, id):
+def add_contract(connection, id, preset):
     conn, cursor = connection
-    cursor.execute('INSERT INTO contracts (contract_id) VALUES (?)', (id,))
+    cursor.execute('INSERT INTO contracts (contract_id, preset) VALUES (?, ?)', (id,preset))
     conn.commit()
 
 
 def set_date(connection, id, date):
     conn, cursor = connection
-    cursor.execute('UPDATE contracts SET pregnancy_start = ? WHERE contract_id = ?', (date, id))
+    cursor.execute('UPDATE contracts SET start = ? WHERE contract_id = ?', (date, id))
+    conn.commit()
+
+def set_preset(connection, id, preset):
+    conn, cursor = connection
+    cursor.execute('UPDATE contracts SET preset = ? WHERE contract_id = ?', (preset, id))
     conn.commit()
 
 
@@ -60,15 +66,18 @@ def delete_contract(connection, id):
     conn.commit()
 
 
-def get_notifications(connection):
+def get_notifications(connection, preset):
     conn, cursor = connection
-    cursor.execute('SELECT * FROM notifications')
+    cursor.execute('SELECT * FROM notifications WHERE preset = ?', [preset, ])
     return cursor.fetchall()
 
 
-def get_contracts(connection):
+def get_contracts(connection, preset=None):
     conn, cursor = connection
-    cursor.execute('SELECT * FROM contracts')
+    if preset:
+        cursor.execute('SELECT * FROM contracts WHERE preset = ?', [preset, ])
+    else:
+        cursor.execute('SELECT * FROM contracts')
     return cursor.fetchall()
 
 
@@ -96,7 +105,7 @@ def status():
 
     answer = {
         "is_tracking_data": True,
-        "supported_scenarios": [],
+        "supported_scenarios": presets,
         "tracked_contracts": [int(contract[0]) for contract in get_contracts(connection)]
     }
 
@@ -108,7 +117,7 @@ def status():
 @app.route('/init', methods=['POST'])
 def init():
     data = request.json
-
+    print(data)
     if data['api_key'] != APP_KEY:
         if DEBUG:
             print('invalid key')
@@ -120,8 +129,20 @@ def init():
 
     contract_id = int(data['contract_id'])
 
+    preset = data.get('preset')
+    params = data.get('params')
+
     connection = get_connection()
-    add_contract(connection, contract_id)
+
+    if preset in presets:
+        add_contract(connection, contract_id, preset)
+    else:
+        add_contract(connection, contract_id, "pregnancy")
+
+    if params and validate_date(params.get('start_date')):
+        start_date = params.get('start_date')
+        set_date(connection, contract_id, start_date)
+
     connection[0].close()
 
     return 'ok'
@@ -184,12 +205,14 @@ def setting_save():
 
     contract_id = int(contract_id)
     date = request.form.get('date', '')
+    preset = request.form.get('preset', '')
 
-    if not validate_date(date):
+    if not validate_date(date) or preset not in presets:
         return "<strong>Ошибки при заполнении формы.</strong> Пожалуйста, что все поля заполнены.<br><a onclick='history.go(-1);'>Назад</a>"
 
     connection = get_connection()
     set_date(connection, contract_id, date)
+    set_preset(connection, contract_id, preset)
     connection[0].close()
 
     return """
@@ -226,18 +249,21 @@ def sender():
         today = datetime.today()
         connection = get_connection()
 
-        contracts = get_contracts(connection)
         sent_notifications = get_sent_notifications(connection)
-        notifications = get_notifications(connection)
-        for event in notifications:
-            for contract in contracts:
-                if not validate_date(contract[1]):
-                    continue
-                start = datetime.strptime(contract[1], '%Y-%m-%d')
 
-                if (event[0], contract[0]) not in sent_notifications and get_week(start, today) >= event[2]:
-                    send(contract[0], event[1])
-                    make_sent(connection, event[0], contract[0])
+        for preset in presets:
+            notifications = get_notifications(connection, preset)
+            contracts = get_contracts(connection, preset)
+
+            for event in notifications:
+                for contract in contracts:
+                    if not validate_date(contract[1]):
+                        continue
+                    start = datetime.strptime(contract[1], '%Y-%m-%d')
+
+                    if (event[0], contract[0]) not in sent_notifications and get_week(start, today) >= event[2]:
+                        send(contract[0], event[1])
+                        make_sent(connection, event[0], contract[0])
 
         connection[0].close()
         time.sleep(60)
