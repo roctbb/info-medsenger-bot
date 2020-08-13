@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 contracts = {}
 available_modes = ['daily', 'weekly', 'none']
-presets = ['pregnancy', 'stenocardia', 'heartfailure', 'fibrillation']
+presets = ['pregnancy', 'stenocardia', 'heartfailure', 'fibrillation', 'hypertensia']
 
 
 def delayed(delay, f, args):
