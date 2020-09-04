@@ -144,6 +144,7 @@ def init():
         set_date(connection, contract_id, start_date)
 
     connection[0].close()
+    delayed(1, sender, [])
 
     return 'ok'
 
@@ -266,7 +267,7 @@ def sender():
                         make_sent(connection, event[0], contract[0])
 
         connection[0].close()
-        time.sleep(60)
+        time.sleep(60 * 5)
 
 
 @app.route('/message', methods=['POST'])
