@@ -6,14 +6,53 @@ import sqlite3
 import requests
 import hashlib, uuid
 from config import *
+from flask_sqlalchemy import SQLAlchemy
+from agents_api import *
 import threading
 import json
 
 app = Flask(__name__)
 
-contracts = {}
 available_modes = ['daily', 'weekly', 'none']
 presets = ['pregnancy', 'stenocardia', 'heartfailure', 'fibrillation', 'hypertensia']
+
+db_string = "postgres://{}:{}@{}:{}/{}".format(DB_LOGIN, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_string
+db = SQLAlchemy(app)
+
+
+class SentNotifications(db.Model):
+    notification_id = db.Column(db.Integer, db.ForeignKey('notification.id'), primary_key=True)
+    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'), primary_key=True)
+
+
+class Contract(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    start = db.Column(db.Date, nullable=True)
+    preset = db.Column(db.String, default='pregnancy', nullable=True)
+
+    sent_notifications = db.relationship('Notification', secondary='sent_notifications',
+                                         backref=db.backref("notification"))
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=True)
+    week = db.Column(db.Integer, default=0)
+    preset = db.Column(db.String, default='pregnancy', nullable=True)
+
+    sent_to = db.relationship('Contract', secondary='sent_notifications', backref=db.backref("contract"))
+
+
+try:
+    db.create_all()
+except:
+    print('cant create structure')
+
+
+def gts():
+    now = datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def delayed(delay, f, args):
@@ -37,61 +76,32 @@ def check_digit(number):
         return False
 
 
-def get_connection():
-    conn = sqlite3.connect('db.sqlite')
-    cursor = conn.cursor()
-    return conn, cursor
+def delete_contract(contract_id):
+    Contract.query.filter_by(id=contract_id).delete()
 
 
-def add_contract(connection, id, preset):
-    conn, cursor = connection
-    cursor.execute('INSERT INTO contracts (contract_id, preset) VALUES (?, ?)', (id,preset))
-    conn.commit()
+def add_contract(contract_id, preset):
+    try:
+        query = Contract.query.filter_by(id=contract_id)
+
+        if query.count() != 0:
+            contract = query.first()
+            contract.preset = preset
+            contract.last_push = 0
+
+            print("{}: Reactivate contract {}".format(gts(), contract.id))
+        else:
+            contract = Contract(id=contract_id, preset=preset)
+            db.session.add(contract)
+
+            print("{}: Add contract {}".format(gts(), contract.id))
+
+        db.session.commit()
 
 
-def set_date(connection, id, date):
-    conn, cursor = connection
-    cursor.execute('UPDATE contracts SET start = ? WHERE contract_id = ?', (date, id))
-    conn.commit()
-
-def set_preset(connection, id, preset):
-    conn, cursor = connection
-    cursor.execute('UPDATE contracts SET preset = ? WHERE contract_id = ?', (preset, id))
-    conn.commit()
-
-
-def delete_contract(connection, id):
-    conn, cursor = connection
-    cursor.execute('DELETE FROM contracts WHERE contract_id = ?', (id,))
-    conn.commit()
-
-
-def get_notifications(connection, preset):
-    conn, cursor = connection
-    cursor.execute('SELECT * FROM notifications WHERE preset = ?', [preset, ])
-    return cursor.fetchall()
-
-
-def get_contracts(connection, preset=None):
-    conn, cursor = connection
-    if preset:
-        cursor.execute('SELECT * FROM contracts WHERE preset = ?', [preset, ])
-    else:
-        cursor.execute('SELECT * FROM contracts')
-    return cursor.fetchall()
-
-
-def get_sent_notifications(connection):
-    conn, cursor = connection
-    cursor.execute('SELECT * FROM sent_notifications')
-    return cursor.fetchall()
-
-
-def make_sent(connection, notification_id, contract_id):
-    conn, cursor = connection
-    cursor.execute('INSERT INTO sent_notifications (notification_id, contract_id) VALUES (?, ?)',
-                   (notification_id, contract_id))
-    conn.commit()
+    except Exception as e:
+        print(e)
+        return "error"
 
 
 @app.route('/status', methods=['POST'])
@@ -101,15 +111,13 @@ def status():
     if data['api_key'] != APP_KEY:
         return 'invalid key'
 
-    connection = get_connection()
+    contract_ids = [l[0] for l in db.session.query(Contract.id).all()]
 
     answer = {
         "is_tracking_data": True,
         "supported_scenarios": presets,
-        "tracked_contracts": [int(contract[0]) for contract in get_contracts(connection)]
+        "tracked_contracts": contract_ids
     }
-
-    connection[0].close()
 
     return json.dumps(answer)
 
@@ -119,12 +127,11 @@ def init():
     data = request.json
     print(data)
     if data['api_key'] != APP_KEY:
-        if DEBUG:
-            print('invalid key')
+        print('invalid key')
         return 'invalid key'
+
     if not check_digit(data['contract_id']):
-        if DEBUG:
-            print('invalid id')
+        print('invalid id')
         return 'invalid id'
 
     contract_id = int(data['contract_id'])
@@ -132,19 +139,18 @@ def init():
     preset = data.get('preset')
     params = data.get('params')
 
-    connection = get_connection()
-
     if preset in presets:
-        add_contract(connection, contract_id, preset)
+        contract = add_contract(contract_id, preset)
     else:
-        add_contract(connection, contract_id, "pregnancy")
+        contract = add_contract(contract_id, "pregnancy")
 
     if params and validate_date(params.get('start_date')):
         start_date = params.get('start_date')
-        set_date(connection, contract_id, start_date)
+        contract.start = start_date
 
-    connection[0].close()
-    delayed(1, sender, [])
+    db.session.commit()
+
+    delayed(1, send_iteration, [])
 
     return 'ok'
 
@@ -155,14 +161,13 @@ def remove():
 
     if data['api_key'] != APP_KEY:
         return 'invalid key'
+
     if not check_digit(data['contract_id']):
         return 'invalid id'
 
     contract_id = int(data['contract_id'])
 
-    connection = get_connection()
-    delete_contract(connection, contract_id)
-    connection[0].close()
+    delete_contract(contract_id)
 
     return 'ok'
 
@@ -175,14 +180,12 @@ def settings():
     if key != APP_KEY:
         return "<strong>Некорректный ключ доступа.</strong> Свяжитесь с технической поддержкой."
 
-    connection = get_connection()
-    contracts = get_contracts(connection)
-    connection[0].close()
+    contract = Contract.query.filter_by(id=contract_id).first()
 
-    if not check_digit(contract_id) or len(list(filter(lambda x: x[0] == int(contract_id), contracts))) == 0:
+    if not check_digit(contract_id) or not contract:
         return "<strong>Запрашиваемый канал консультирования не найден.</strong> Попробуйте отключить и заного подключить интеллектуального агента. Если это не сработает, свяжитесь с технической поддержкой."
 
-    return render_template('settings.html', contract=list(filter(lambda x: x[0] == int(contract_id), contracts))[0])
+    return render_template('settings.html', contract=contract)
 
 
 @app.route('/', methods=['GET'])
@@ -195,47 +198,27 @@ def setting_save():
     key = request.args.get('api_key', '')
     contract_id = request.args.get('contract_id', '')
 
-    connection = get_connection()
-    contracts = get_contracts(connection)
-    connection[0].close()
+    contract = Contract.query.filter_by(id=contract_id).first()
 
     if key != APP_KEY:
         return "<strong>Некорректный ключ доступа.</strong> Свяжитесь с технической поддержкой."
-    if not check_digit(contract_id) or len(list(filter(lambda x: x[0] == int(contract_id), contracts))) == 0:
+    if not check_digit(contract_id) or not contract \
+            :
         return "<strong>Запрашиваемый канал консультирования не найден.</strong> Попробуйте отключить и заного подключить интеллектуального агента. Если это не сработает, свяжитесь с технической поддержкой."
 
-    contract_id = int(contract_id)
     date = request.form.get('date', '')
     preset = request.form.get('preset', '')
 
     if not validate_date(date) or preset not in presets:
         return "<strong>Ошибки при заполнении формы.</strong> Пожалуйста, что все поля заполнены.<br><a onclick='history.go(-1);'>Назад</a>"
 
-    connection = get_connection()
-    set_date(connection, contract_id, date)
-    set_preset(connection, contract_id, preset)
-    connection[0].close()
+    contract.start = date
+    contract.preset = preset
+    db.session.commit()
 
     return """
             <strong>Спасибо, окно можно закрыть</strong><script>window.parent.postMessage('close-modal-success','*');</script>
             """
-
-
-def send(contract_id, message):
-    data = {
-        "contract_id": contract_id,
-        "api_key": APP_KEY,
-        "message": {
-            "text": message,
-            "only_doctor": False,
-            "only_patient": True,
-        }
-    }
-    try:
-        result = requests.post(MAIN_HOST + '/api/agents/message', json=data)
-        print('sent to', contract_id)
-    except Exception as e:
-        print('connection error', e)
 
 
 def get_week(start, now):
@@ -245,28 +228,29 @@ def get_week(start, now):
     return (monday1 - monday2).days // 7
 
 
+def send_iteration():
+    today = datetime.today().date()
+
+    for preset in presets:
+        notifications = Notification.query.filter_by(preset=preset).all()
+        contracts = Contract.query.filter_by(preset=preset).all()
+
+        for notification in notifications:
+            for contract in contracts:
+                if not contract.start:
+                    continue
+
+                if notification not in contract.sent_notifications and get_week(contract.start,
+                                                                                today) >= notification.week:
+                    send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
+                    contract.sent_notifications.append(notification)
+
+    db.session.commit()
+
+
 def sender():
     while True:
-        today = datetime.today()
-        connection = get_connection()
-
-        sent_notifications = get_sent_notifications(connection)
-
-        for preset in presets:
-            notifications = get_notifications(connection, preset)
-            contracts = get_contracts(connection, preset)
-
-            for event in notifications:
-                for contract in contracts:
-                    if not validate_date(contract[1]):
-                        continue
-                    start = datetime.strptime(contract[1], '%Y-%m-%d')
-
-                    if (event[0], contract[0]) not in sent_notifications and get_week(start, today) >= event[2]:
-                        send(contract[0], event[1])
-                        make_sent(connection, event[0], contract[0])
-
-        connection[0].close()
+        send_iteration()
         time.sleep(60 * 5)
 
 
@@ -278,4 +262,4 @@ def message():
 t = Thread(target=sender)
 t.start()
 
-app.run(port='9999')
+app.run(host=HOST, port=PORT)
