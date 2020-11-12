@@ -16,17 +16,17 @@
     <form method="post">
         <div class="form-group">
             <label for="date">Начало отсчета:</label>
-            <input type="date" id="date" class="form-control" value="{{contract[1]}}" name="date"/>
+            <input type="date" id="date" class="form-control" value="{{contract.start}}" name="date"/>
         </div>
 
         <div class="form-group">
             <label for="preset">Набор сообщений:</label>
             <select name="preset" class="form-control" id="preset">
-                <option value="pregnancy" {% if contract[2] == 'pregnancy' %} selected {% endif %}>Беременность</option>
-                <option value="heartfailure" {% if contract[2] == 'heartfailure' %} selected {% endif %}>Сердечная недостаточность</option>
-                <option value="stenocardia" {% if contract[2] == 'stenocardia' %} selected {% endif %}>Стенокардия</option>
-                <option value="fibrillation" {% if contract[2] == 'fibrillation' %} selected {% endif %}>Фибрилляция предсердий</option>
-                <option value="hypertensia" {% if contract[2] == 'hypertensia' %} selected {% endif %}>Гипертония</option>
+                <option value="pregnancy" {% if contract.preset == 'pregnancy' %} selected {% endif %}>Беременность</option>
+                <option value="heartfailure" {% if contract.preset == 'heartfailure' %} selected {% endif %}>Сердечная недостаточность</option>
+                <option value="stenocardia" {% if contract.preset == 'stenocardia' %} selected {% endif %}>Стенокардия</option>
+                <option value="fibrillation" {% if contract.preset == 'fibrillation' %} selected {% endif %}>Фибрилляция предсердий</option>
+                <option value="hypertensia" {% if contract.preset == 'hypertensia' %} selected {% endif %}>Гипертония</option>
             </select>
         </div>
 

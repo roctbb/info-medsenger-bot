@@ -182,7 +182,6 @@ def settings():
         return "<strong>Некорректный ключ доступа.</strong> Свяжитесь с технической поддержкой."
 
     contract = Contract.query.filter_by(id=contract_id).first()
-    print(contract)
 
     if not check_digit(contract_id) or not contract:
         return "<strong>Запрашиваемый канал консультирования не найден.</strong> Попробуйте отключить и заного подключить интеллектуального агента. Если это не сработает, свяжитесь с технической поддержкой."
