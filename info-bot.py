@@ -98,10 +98,11 @@ def add_contract(contract_id, preset):
 
         db.session.commit()
 
+        return contract
 
     except Exception as e:
         print(e)
-        return "error"
+        return None
 
 
 @app.route('/status', methods=['POST'])
