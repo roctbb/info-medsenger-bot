@@ -149,6 +149,11 @@ def init():
         start_date = params.get('start_date')
         contract.start = start_date
 
+    if params and check_digit(params.get('week')):
+        week = int(params.get('week'))
+        if week > 0 and week < 40:
+            contract.start = datetime.today() - timedelta(weeks=week)
+
     db.session.commit()
 
     delayed(1, send_iteration, [])
