@@ -156,7 +156,7 @@ def init():
 
     db.session.commit()
 
-    delayed(1, send_iteration, [])
+    delayed(1, tasks, [])
 
     return 'ok'
 
@@ -234,7 +234,7 @@ def get_week(start, now):
     return (monday1 - monday2).days // 7
 
 
-def send_iteration():
+def tasks():
     today = datetime.today().date()
 
     for preset in presets:
@@ -253,10 +253,9 @@ def send_iteration():
 
     db.session.commit()
 
-
 def sender():
     while True:
-        send_iteration()
+        tasks()
         time.sleep(60 * 5)
 
 
@@ -264,8 +263,8 @@ def sender():
 def message():
     return "ok"
 
+if __name__ == "__main__":
+    t = Thread(target=sender)
+    t.start()
 
-t = Thread(target=sender)
-t.start()
-
-app.run(host=HOST, port=PORT)
+    app.run(host=HOST, port=PORT)
