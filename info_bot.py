@@ -22,8 +22,8 @@ db = SQLAlchemy(app)
 
 
 class SentNotifications(db.Model):
-    notification_id = db.Column(db.Integer, db.ForeignKey('notification.id'), primary_key=True)
-    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id'), primary_key=True)
+    notification_id = db.Column(db.Integer, db.ForeignKey('notification.id', ondelete="CASCADE"), primary_key=True)
+    contract_id = db.Column(db.Integer, db.ForeignKey('contract.id', ondelete="CASCADE"), primary_key=True)
 
 
 class Contract(db.Model):
