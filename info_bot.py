@@ -156,7 +156,7 @@ def init():
 
     db.session.commit()
 
-    delayed(1, tasks, [])
+    tasks()
 
     return 'ok'
 
