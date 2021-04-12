@@ -240,9 +240,9 @@ def tasks():
         for notification in notifications:
 
             if notification.preset == contract.preset:
-
-                if notification not in contract.sent_notifications and get_week(contract.start,
-                                                                                today) >= notification.week:
+                if contract.preset not in presets:
+                    print(contract, contract.start, contract.preset)
+                if notification not in contract.sent_notifications and get_week(contract.start, today) >= notification.week:
                     send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
                     contract.sent_notifications.append(notification)
 
