@@ -139,11 +139,7 @@ def init():
 
     preset = data.get('preset')
     params = data.get('params')
-
-    if preset in presets:
-        contract = add_contract(contract_id, preset)
-    else:
-        contract = add_contract(contract_id, "pregnancy")
+    contract = add_contract(contract_id, preset)
 
     if params and validate_date(params.get('start_date')):
         start_date = params.get('start_date')
@@ -215,11 +211,12 @@ def setting_save():
     date = request.form.get('date', '')
     preset = request.form.get('preset', '')
 
-    if not validate_date(date) or preset not in presets:
+    if not validate_date(date) or (preset not in presets and preset != 'other'):
         return "<strong>Ошибки при заполнении формы.</strong> Пожалуйста, что все поля заполнены.<br><a onclick='history.go(-1);'>Назад</a>"
 
     contract.start = date
-    contract.preset = preset
+    if preset != 'other':
+        contract.preset = preset
     db.session.commit()
 
     return """

@@ -22,6 +22,7 @@
         <div class="form-group">
             <label for="preset">Набор сообщений:</label>
             <select name="preset" class="form-control" id="preset">
+                <option value="other">Другое</option>
                 <option value="pregnancy" {% if contract.preset == 'pregnancy' %} selected {% endif %}>Беременность</option>
                 <option value="heartfailure" {% if contract.preset == 'heartfailure' %} selected {% endif %}>Сердечная недостаточность</option>
                 <option value="stenocardia" {% if contract.preset == 'stenocardia' %} selected {% endif %}>Стенокардия</option>
