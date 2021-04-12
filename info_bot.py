@@ -233,16 +233,12 @@ def get_week(start, now):
 
 def tasks():
     today = datetime.today().date()
+    contracts = Contract.query.filter_by(Contract.preset != None).all()
+    notifications = Notification.query.all()
 
-    for preset in presets:
-        notifications = Notification.query.filter_by(preset=preset).all()
-        contracts = Contract.query.filter_by(preset=preset).all()
-
+    for contract in contracts:
         for notification in notifications:
-            for contract in contracts:
-                if not contract.start:
-                    continue
-
+            if notification.preset == contract.preset:
                 if notification not in contract.sent_notifications and get_week(contract.start,
                                                                                 today) >= notification.week:
                     send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
