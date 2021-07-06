@@ -140,7 +140,7 @@ def init():
     preset = [data.get('preset')]
     params = data.get('params')
 
-    for key, value in params.items:
+    for key, value in params.items():
         if "info_" in key:
             preset.append(value.replace('info_', ''))
 
