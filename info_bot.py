@@ -137,9 +137,14 @@ def init():
 
     contract_id = int(data['contract_id'])
 
-    preset = data.get('preset')
+    preset = [data.get('preset')]
     params = data.get('params')
-    contract = add_contract(contract_id, preset)
+
+    for key, value in params.items:
+        if "info_" in key:
+            preset.append(value)
+
+    contract = add_contract(contract_id, '|'.join(preset))
 
     if params and validate_date(params.get('start_date')):
         start_date = params.get('start_date')
@@ -239,7 +244,7 @@ def tasks():
     for contract in contracts:
         for notification in notifications:
 
-            if notification.preset == contract.preset:
+            if notification.preset in contract.preset.split('|'):
                 if notification not in contract.sent_notifications and get_week(contract.start, today) >= notification.week:
                     send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
                     contract.sent_notifications.append(notification)
