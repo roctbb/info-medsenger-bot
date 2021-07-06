@@ -140,9 +140,9 @@ def init():
     preset = [data.get('preset')]
     params = data.get('params')
 
-    for key, value in params.items():
+    for key in params:
         if "info_" in key:
-            preset.append(value.replace('info_', ''))
+            preset.append(key.replace('info_', ''))
 
     contract = add_contract(contract_id, '|'.join(preset))
 
