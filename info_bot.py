@@ -77,7 +77,7 @@ def check_digit(number):
 
 
 def delete_contract(contract_id):
-    SentNotifications.filter_by(contract_id=contract_id).delete()
+    SentNotifications.query.filter_by(contract_id=contract_id).delete()
     Contract.query.filter_by(id=contract_id).delete()
     db.session.commit()
 
