@@ -139,15 +139,18 @@ def init():
 
     contract_id = int(data['contract_id'])
 
-    preset = [data.get('preset')]
+    preset = data.get('preset')
     params = data.get('params')
 
     if params:
+        preset = [data.get('preset')]
         for key, value in params.items():
             if "info_" in key and value:
                 preset.append(key.replace('info_', ''))
+        preset = '|'.join(preset)
 
-    contract = add_contract(contract_id, '|'.join(preset))
+
+    contract = add_contract(contract_id, preset)
 
     if params and validate_date(params.get('start_date')):
         start_date = params.get('start_date')
