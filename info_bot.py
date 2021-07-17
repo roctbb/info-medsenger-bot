@@ -147,6 +147,8 @@ def init():
         for key, value in params.items():
             if "info_" in key and value:
                 preset.append(key.replace('info_', ''))
+            if "info" == key:
+                preset.append(value)
         preset = '|'.join(preset)
 
 
