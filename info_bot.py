@@ -7,9 +7,11 @@ import requests
 import hashlib, uuid
 from config import *
 from flask_sqlalchemy import SQLAlchemy
-from agents_api import *
+from medsenger_api import AgentApiClient
 import threading
 import json
+
+medsenger_api = AgentApiClient(APP_KEY, MAIN_HOST, AGENT_ID, API_DEBUG)
 
 app = Flask(__name__)
 
@@ -40,6 +42,7 @@ class Notification(db.Model):
     text = db.Column(db.Text, nullable=True)
     week = db.Column(db.Integer, default=0)
     preset = db.Column(db.String, default='pregnancy', nullable=True)
+    info_materials = db.Column(db.Text, nullable=True)
 
     sent_to = db.relationship('Contract', secondary='sent_notifications', backref=db.backref("contract"))
 
@@ -252,7 +255,11 @@ def tasks():
 
             if notification.preset in contract.preset.split('|'):
                 if notification not in contract.sent_notifications and get_week(contract.start, today) >= notification.week:
-                    send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
+                    medsenger_api.send_message(contract.id, notification.text, only_doctor=False, only_patient=True)
+
+                    if notification.info_materials:
+                        medsenger_api.set_info_materials(contract.id, notification.info_materials)
+
                     contract.sent_notifications.append(notification)
 
     db.session.commit()
